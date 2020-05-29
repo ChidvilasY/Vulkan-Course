@@ -40,11 +40,16 @@ private:
     VkSurfaceKHR m_surface{};
     VkSwapchainKHR m_swapchain{};
     std::vector<SwapchainImage> m_swapChainImages{};
+    std::vector<VkFramebuffer> m_swapChainFrameBuffers{};
+    std::vector<VkCommandBuffer> m_commandBuffers{};
 
     // - Pipeline
     VkPipeline m_graphicsPipeline;
     VkPipelineLayout m_pipelineLayout{};
     VkRenderPass m_renderPass{};
+
+    // - Pools
+    VkCommandPool m_graphicsCommandPool{};
 
     // - Utility
     QueueFamilyIndices m_indices{};
@@ -64,6 +69,12 @@ private:
     void CreateSwapChain();
     void CreateRenderPass();
     void CreateGraphicsPipeline();
+    void CreateFrameBuffers();
+    void CreateCommandPool();
+    void CreateCommandBuffers();
+
+    // - Record Functions
+    void RecordCommands();
 
     // - Get Functions
     void GetPhysicalDevice();
