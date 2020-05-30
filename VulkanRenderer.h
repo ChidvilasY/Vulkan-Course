@@ -25,6 +25,8 @@ public:
 private:
     GLFWwindow *m_window = nullptr;
 
+    int m_currentFrame = 0;
+
     // Vulkan Components
     // - Main
     VkInstance m_vkInstance = nullptr;
@@ -58,8 +60,9 @@ private:
     VkExtent2D m_swapChainExtent{};
 
     // - Synchronization
-    VkSemaphore m_imageAvailable{};
-    VkSemaphore m_renderFinished{};
+    std::vector<VkSemaphore> m_imageAvailable{};
+    std::vector<VkSemaphore> m_renderFinished{};
+    std::vector<VkFence> m_drawFences{};
 
     // - Validation
     VkDebugReportCallbackEXT m_callback{};

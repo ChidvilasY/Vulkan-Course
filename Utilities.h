@@ -2,12 +2,14 @@
 
 #include <fstream>
 
+constexpr int MAX_FRAME_DRAWS = 2;
+
 const std::vector<const char*> gDeviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
 // Indices (locations) of Queue Families (if they exist at all)
-struct QueueFamilyIndices 
+struct QueueFamilyIndices
 {
     int graphicsFamily = -1;        // Locaiton of Graphics Queue Family
     int presentationFamily = -1;    // Location of Presentation Queue Family
@@ -19,7 +21,7 @@ struct QueueFamilyIndices
     }
 };
 
-struct SwapChainDetails 
+struct SwapChainDetails
 {
     VkSurfaceCapabilitiesKHR surfaceCapabilities{};     // Surface properties, e.g. image size/extent
     std::vector<VkSurfaceFormatKHR> formats;            // Surface image formats, e.g. RGBA and sizeof each color
@@ -33,11 +35,11 @@ struct SwapchainImage {
 
 static std::vector<char> ReadFile(const std::string& fileName)
 {
-    // Open stream from given file 
+    // Open stream from given file
     // std::ios::binary tells stream to read file as binary
     // std::ios::ate tells stream start reading from end of file
     std::ifstream file(fileName, std::ios::binary | std::ios::ate);
-    
+
     // Check if file stream successfully opened
     if (!file.is_open())
     {
@@ -51,7 +53,7 @@ static std::vector<char> ReadFile(const std::string& fileName)
     // Move read position to start of the file
     file.seekg(0);
 
-    // Read file data into the buffer 
+    // Read file data into the buffer
     file.read(fileBuffer.data(), fileSize);
 
     // Close the file
