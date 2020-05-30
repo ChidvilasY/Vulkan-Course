@@ -19,6 +19,7 @@ public:
     ~VulkanRenderer();
 
     int Init(GLFWwindow *newWindow);
+    void Draw();
     void CleanUP();
 
 private:
@@ -56,6 +57,10 @@ private:
     VkFormat m_swapChainImageFormat{};
     VkExtent2D m_swapChainExtent{};
 
+    // - Synchronization
+    VkSemaphore m_imageAvailable{};
+    VkSemaphore m_renderFinished{};
+
     // - Validation
     VkDebugReportCallbackEXT m_callback{};
     VkDebugUtilsMessengerEXT m_debugMessenger{};
@@ -72,6 +77,7 @@ private:
     void CreateFrameBuffers();
     void CreateCommandPool();
     void CreateCommandBuffers();
+    void CreateSynchronization();
 
     // - Record Functions
     void RecordCommands();

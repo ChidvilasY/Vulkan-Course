@@ -29,6 +29,7 @@ int VulkanRenderer::Init(GLFWwindow *newWindow)
         CreateCommandPool();
         CreateCommandBuffers();
         RecordCommands();
+        CreateSynchronization();
     }
     catch (std::runtime_error &e)
     {
@@ -39,14 +40,67 @@ int VulkanRenderer::Init(GLFWwindow *newWindow)
     return 0;
 }
 
+void VulkanRenderer::Draw()
+{
+    // -- GET NEXT IMAGE --
+    // Get index of next image to be drawn to, and signal semaphore when ready to be drawn to
+    uint32_t imageIndex;
+    vkAcquireNextImageKHR(m_mainDevice.logicalDevice, m_swapchain, std::numeric_limits<uint64_t>::max(), m_imageAvailable, VK_NULL_HANDLE, &imageIndex);
+
+    // -- SUBMIT COMMAND BUFFER TO RENDER
+    // Queue submission information
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.waitSemaphoreCount = 1;              // Number of semaphores to wait on
+    submitInfo.pWaitSemaphores = &m_imageAvailable; // List of semaphores to wait on
+    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    submitInfo.pWaitDstStageMask = waitStages;                  // Stages to check semaphores at
+    submitInfo.commandBufferCount = 1;                          // Number of command buffers to submit
+    submitInfo.pCommandBuffers = &m_commandBuffers[imageIndex]; // Command buffer to submit
+    submitInfo.signalSemaphoreCount = 1;                        // Number of semaphores to signal
+    submitInfo.pSignalSemaphores = &m_renderFinished;           // Semaphores to signal when command buffer finishes
+
+    // Submit command buffer to queue
+    VkResult result = vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    if (result != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to submit Command Buffer to Queue");
+    }
+
+    // -- PRESENT RENDERED IMAGE TO SCREEN --
+    VkPresentInfoKHR presentInfo = {};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.waitSemaphoreCount = 1;              // Number of semaphores to wait on
+    presentInfo.pWaitSemaphores = &m_renderFinished; // Semaphores to wait on
+    presentInfo.swapchainCount = 1;                  // Number of swapchains to present to
+    presentInfo.pSwapchains = &m_swapchain;          // Swapchains to present images to
+    presentInfo.pImageIndices = &imageIndex;         // Index of images in Swapchains to present
+
+    // Present image
+    result = vkQueuePresentKHR(m_presentationQueue, &presentInfo);
+    if (result != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to present image");
+    }
+}
+
 void VulkanRenderer::CleanUP()
 {
+    vkDeviceWaitIdle(m_mainDevice.logicalDevice);
+
+    vkDestroySemaphore(m_mainDevice.logicalDevice, m_renderFinished, nullptr);
+    m_renderFinished = nullptr;
+
+    vkDestroySemaphore(m_mainDevice.logicalDevice, m_imageAvailable, nullptr);
+    m_imageAvailable = nullptr;
+
     vkDestroyCommandPool(m_mainDevice.logicalDevice, m_graphicsCommandPool, nullptr);
     m_graphicsCommandPool = nullptr;
 
     for (auto &frameBuffer : m_swapChainFrameBuffers)
     {
         vkDestroyFramebuffer(m_mainDevice.logicalDevice, frameBuffer, nullptr);
+        frameBuffer = nullptr;
     }
 
     vkDestroyPipeline(m_mainDevice.logicalDevice, m_graphicsPipeline, nullptr);
@@ -101,7 +155,7 @@ void VulkanRenderer::CreateInstance()
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0); // Custom version of application
     appInfo.pEngineName = "No Engine";                     // Custom Engine Name
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);      // Custom Engine Version
-    appInfo.apiVersion = VK_API_VERSION_1_1;               // The Vulkan Version
+    appInfo.apiVersion = VK_API_VERSION_1_0;               // The Vulkan Version
 
     // Creation information for a VkInstance (Vulkan Instance)
     VkInstanceCreateInfo createInfo = {};
@@ -374,9 +428,9 @@ void VulkanRenderer::CreateRenderPass()
 
     // Transition must happen before ...
     subpassDependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
-    subpassDependencies[1].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    subpassDependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
     subpassDependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-    subpassDependencies[0].dependencyFlags = 0;
+    subpassDependencies[1].dependencyFlags = 0;
 
     // Create info for Render Pass
     VkRenderPassCreateInfo renderPassCreateInfo = {};
@@ -517,7 +571,6 @@ void VulkanRenderer::CreateGraphicsPipeline()
     VkPipelineColorBlendStateCreateInfo colorBlendingCreateInfo = {};
     colorBlendingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlendingCreateInfo.logicOpEnable = VK_FALSE; // Alternative to calculations is to use logical operations
-    colorBlendingCreateInfo.logicOp = VK_LOGIC_OP_COPY;
     colorBlendingCreateInfo.attachmentCount = 1;
     colorBlendingCreateInfo.pAttachments = &colorState;
 
@@ -1008,8 +1061,7 @@ void VulkanRenderer::RecordCommands()
     renderPassBeginInfo.renderPass = m_renderPass;             // Render Pass to begin
     renderPassBeginInfo.renderArea.offset = {0, 0};            // Start point of render pass in pixels
     renderPassBeginInfo.renderArea.extent = m_swapChainExtent; // Size of region to run render pass on (starting at offset)
-    VkClearValue clearValues[] = {
-        {{0.6f, 0.5f, 0.4f, 1.0f}}};
+    VkClearValue clearValues[] = {{{0.6f, 0.65f, 0.4, 1.0f}}};
     renderPassBeginInfo.pClearValues = clearValues; // List of clear values (TODO: Depth Attachment Clear Value)
     renderPassBeginInfo.clearValueCount = 1;
 
@@ -1046,5 +1098,19 @@ void VulkanRenderer::RecordCommands()
         {
             throw std::runtime_error("Failed to start recording a Command Buffer");
         }
+    }
+}
+
+void VulkanRenderer::CreateSynchronization()
+{
+    // Semaphore creation information
+    VkSemaphoreCreateInfo semaphoreCreateInfo = {};
+    semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    //
+    if (vkCreateSemaphore(m_mainDevice.logicalDevice, &semaphoreCreateInfo, nullptr, &m_imageAvailable) != VK_SUCCESS ||
+        vkCreateSemaphore(m_mainDevice.logicalDevice, &semaphoreCreateInfo, nullptr, &m_renderFinished) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create a semaphore");
     }
 }
