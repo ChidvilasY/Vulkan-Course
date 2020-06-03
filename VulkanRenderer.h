@@ -11,6 +11,7 @@
 
 #include "VulkanValidation.h"
 #include "Utilities.h"
+#include "Mesh.hpp"
 
 class VulkanRenderer
 {
@@ -26,6 +27,9 @@ private:
     GLFWwindow *m_window = nullptr;
 
     int m_currentFrame = 0;
+
+    // Scene Objects
+    Mesh m_firstMesh;
 
     // Vulkan Components
     // - Main
