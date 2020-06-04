@@ -10,6 +10,19 @@
             "cStandard": "c11",
             "cppStandard": "gnu++17",
             "intelliSenseMode": "gcc-x64"
+        },
+        {
+            "name": "Win",
+            "includePath": [
+                "C:/glm",
+                "C:/VulkanSDK/1.2.135.0/Include",
+                "C:/GLFW/glfw-3.3.2.bin.WIN64/include"
+            ],
+            "defines": [],
+            "compilerPath": "C:/Strawberry64/c/bin/g++.exe",
+            "cStandard": "c11",
+            "cppStandard": "gnu++17",
+            "intelliSenseMode": "gcc-x64"
         }
     ],
     "version": 4
