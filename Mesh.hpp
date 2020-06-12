@@ -7,11 +7,18 @@
 
 #include "Utilities.h"
 
+struct UBOModel {
+    glm::mat4 model;
+};
+
 class Mesh
 {
 public:
     Mesh();
     Mesh(VkPhysicalDevice newPhysicalDevice, VkDevice newDevice, VkQueue transferQueue, VkCommandPool transferCommandPool, std::vector<Vertex> *vertices, std::vector<uint32_t> *indices);
+
+    void SetModel(glm::mat4 newModel);
+    UBOModel GetModel();
 
     int GetVertexCount();
     VkBuffer GetVertexBuffer();
@@ -24,6 +31,8 @@ public:
     ~Mesh();
 
 private:
+    UBOModel m_uboModel;
+
     int m_vertexCount;
     VkBuffer m_vertexBuffer{};
     VkDeviceMemory m_vertexBufferMemory{};

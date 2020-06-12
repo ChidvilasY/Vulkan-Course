@@ -30,25 +30,24 @@ int VulkanRenderer::Init(GLFWwindow *newWindow)
         CreateCommandPool();
 
         {
-            mvp.projection = glm::perspective(glm::radians(45.f), m_swapChainExtent.width / (float)m_swapChainExtent.height, 0.1f, 100.f);
-            mvp.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-            mvp.model = glm::mat4(1.0f);
-            mvp.projection[1][1] *= -1; // Vulkan Considers Y-axis negative to be UP direction
+            m_uboViewProjection.projection = glm::perspective(glm::radians(45.f), m_swapChainExtent.width / (float)m_swapChainExtent.height, 0.1f, 100.f);
+            m_uboViewProjection.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            m_uboViewProjection.projection[1][1] *= -1; // Vulkan Considers Y-axis negative to be UP direction
 
             // Create a mesh
             // Vertex Data
             std::vector<Vertex> meshVertices1 = {
-                {{-0.1, -0.4, 0.0}, {1.0, 0.0, 0.0}}, // 0
-                {{-0.1, 0.4, 0.0}, {0.0, 1.0, 0.0}},  // 1
-                {{-0.9, 0.4, 0.0}, {0.0, 0.0, 1.0}},  // 2
-                {{-0.9, -0.4, 0.0}, {1.0, 1.0, 0.0}}, // 3
+                {{-0.4, 0.4, 0.0}, {1.0, 0.0, 0.0}},  // 0
+                {{-0.4, -0.4, 0.0}, {0.0, 1.0, 0.0}}, // 1
+                {{0.4, -0.4, 0.0}, {0.0, 0.0, 1.0}},  // 2
+                {{0.4, 0.4, 0.0}, {1.0, 1.0, 0.0}},   // 3
             };
 
             std::vector<Vertex> meshVertices2 = {
-                {{0.9, -0.4, 0.0}, {1.0, 0.0, 0.0}}, // 0
-                {{0.9, 0.4, 0.0}, {0.0, 1.0, 0.0}},  // 1
-                {{0.1, 0.4, 0.0}, {0.0, 0.0, 1.0}},  // 2
-                {{0.1, -0.4, 0.0}, {1.0, 1.0, 0.0}}, // 3
+                {{-0.4, 0.4, 0.0}, {1.0, 0.0, 0.0}},  // 0
+                {{-0.4, -0.4, 0.0}, {0.0, 1.0, 0.0}}, // 1
+                {{0.4, -0.4, 0.0}, {0.0, 0.0, 1.0}},  // 2
+                {{0.4, 0.4, 0.0}, {1.0, 1.0, 0.0}},   // 3
             };
 
             // Index Data
@@ -64,6 +63,7 @@ int VulkanRenderer::Init(GLFWwindow *newWindow)
         }
 
         CreateCommandBuffers();
+        AllocateDynamicBufferTransferSpace();
         CreateUniformBuffers();
         CreateDescriptorPool();
         CreateDescriptorSets();
@@ -91,7 +91,7 @@ void VulkanRenderer::Draw()
     uint32_t imageIndex;
     vkAcquireNextImageKHR(m_mainDevice.logicalDevice, m_swapchain, std::numeric_limits<uint64_t>::max(), m_imageAvailable[m_currentFrame], VK_NULL_HANDLE, &imageIndex);
 
-    UpdateUniformBuffer(imageIndex);
+    UpdateUniformBuffers(imageIndex);
 
     // -- SUBMIT COMMAND BUFFER TO RENDER
     // Queue submission information
@@ -138,19 +138,27 @@ void VulkanRenderer::CleanUP()
     // Wait until no actions being run on device before destoying
     vkDeviceWaitIdle(m_mainDevice.logicalDevice);
 
+    free(m_modelTransferSpace);
+
     vkDestroyDescriptorPool(m_mainDevice.logicalDevice, m_descriptorPool, nullptr);
     m_descriptorPool = nullptr;
 
     vkDestroyDescriptorSetLayout(m_mainDevice.logicalDevice, m_descriptorSetLayout, nullptr);
     m_descriptorSetLayout = nullptr;
 
-    for (size_t i = 0; i < m_uniformBuffer.size(); i++)
+    for (size_t i = 0; i < m_swapChainImages.size(); i++)
     {
-        vkDestroyBuffer(m_mainDevice.logicalDevice, m_uniformBuffer[i], nullptr);
-        m_uniformBuffer[i] = nullptr;
+        vkDestroyBuffer(m_mainDevice.logicalDevice, m_vpUniformBuffer[i], nullptr);
+        m_vpUniformBuffer[i] = nullptr;
 
-        vkFreeMemory(m_mainDevice.logicalDevice, m_uniformBufferMemory[i], nullptr);
-        m_uniformBufferMemory[i] = nullptr;
+        vkFreeMemory(m_mainDevice.logicalDevice, m_vpUniformBufferMemory[i], nullptr);
+        m_vpUniformBufferMemory[i] = nullptr;
+
+        vkDestroyBuffer(m_mainDevice.logicalDevice, m_modelDynUniformBuffer[i], nullptr);
+        m_modelDynUniformBuffer[i] = nullptr;
+
+        vkFreeMemory(m_mainDevice.logicalDevice, m_modelDynUniformBufferMemory[i], nullptr);
+        m_modelDynUniformBufferMemory[i] = nullptr;
     }
 
     for (auto &mesh : m_meshList)
@@ -527,19 +535,29 @@ void VulkanRenderer::CreateRenderPass()
 
 void VulkanRenderer::CreateDescriptorSetLayout()
 {
-    // MVP Binding info
-    VkDescriptorSetLayoutBinding mvpLayoutBinding = {};
-    mvpLayoutBinding.binding = 0;                                        // Binding point in shader (designated by binding number in shader)
-    mvpLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // Type of decriptor (uniform, dynamic uniform, image sampler, etc)
-    mvpLayoutBinding.descriptorCount = 1;                                // Number of descriptors for binding
-    mvpLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;            // Shader to stage to bind to
-    mvpLayoutBinding.pImmutableSamplers = nullptr;                       // For Texture: Can make sampler data unchangeable (immutable) by specifying in layout
+    // VP Binding info
+    VkDescriptorSetLayoutBinding vpLayoutBinding = {};
+    vpLayoutBinding.binding = 0;                                        // Binding point in shader (designated by binding number in shader)
+    vpLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // Type of decriptor (uniform, dynamic uniform, image sampler, etc)
+    vpLayoutBinding.descriptorCount = 1;                                // Number of descriptors for binding
+    vpLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;            // Shader to stage to bind to
+    vpLayoutBinding.pImmutableSamplers = nullptr;                       // For Texture: Can make sampler data unchangeable (immutable) by specifying in layout
+
+    // MODEL Binding info
+    VkDescriptorSetLayoutBinding modelLayoutBinding = {};
+    modelLayoutBinding.binding = 1;
+    modelLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    modelLayoutBinding.descriptorCount = 1;
+    modelLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    modelLayoutBinding.pImmutableSamplers = nullptr;
+
+    std::vector<VkDescriptorSetLayoutBinding> layoutBindings = {vpLayoutBinding, modelLayoutBinding};
 
     // Create Descriptor Set Layout with given bindings
     VkDescriptorSetLayoutCreateInfo layoutCreateInfo = {};
     layoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutCreateInfo.bindingCount = 1;              // Number of binding infos
-    layoutCreateInfo.pBindings = &mvpLayoutBinding; // Array of binding infos
+    layoutCreateInfo.bindingCount = static_cast<uint32_t>(layoutBindings.size()); // Number of binding infos
+    layoutCreateInfo.pBindings = layoutBindings.data();                           // Array of binding infos
 
     // Create Descriptor Set Layout
     VkResult result = vkCreateDescriptorSetLayout(m_mainDevice.logicalDevice, &layoutCreateInfo, nullptr, &m_descriptorSetLayout);
@@ -770,6 +788,11 @@ void VulkanRenderer::GetPhysicalDevice()
             break;
         }
     }
+
+    VkPhysicalDeviceProperties deviceProperties;
+    vkGetPhysicalDeviceProperties(m_mainDevice.physicalDevice, &deviceProperties);
+
+    m_minUniformBufferOffset = deviceProperties.limits.minUniformBufferOffsetAlignment;
 }
 
 bool VulkanRenderer::CheckInstanceExtensionsSupport(std::vector<const char *> checkExtensions)
@@ -809,7 +832,11 @@ bool VulkanRenderer::CheckDeviceSuitable(VkPhysicalDevice device)
     // Information about device itself (ID, type, name, vendor etc)
     VkPhysicalDeviceProperties deviceProperties;
     vkGetPhysicalDeviceProperties(device, &deviceProperties);
-    std::cout << "Vendor ID: " << deviceProperties.vendorID << std::endl;
+    std::cout << "Vendor ID: "
+              << "0x" << std::hex << deviceProperties.vendorID << " ";
+    std::cout << "Device ID: "
+              << "0x" << std::hex << deviceProperties.deviceID << " ";
+    std::cout << deviceProperties.deviceName << std::endl;
 
     // Information about what the device can do (geo shader, tess shader, wide lines etc)
     VkPhysicalDeviceFeatures deviceFeatures;
@@ -1182,7 +1209,7 @@ void VulkanRenderer::RecordCommands()
     renderPassBeginInfo.renderPass = m_renderPass;             // Render Pass to begin
     renderPassBeginInfo.renderArea.offset = {0, 0};            // Start point of render pass in pixels
     renderPassBeginInfo.renderArea.extent = m_swapChainExtent; // Size of region to run render pass on (starting at offset)
-    VkClearValue clearValues[] = {{{0.6f, 0.65f, 0.4, 1.0f}}};
+    VkClearValue clearValues[] = {{{0.2f, 0.6f, 0.8, 1.0f}}};
     renderPassBeginInfo.pClearValues = clearValues; // List of clear values (TODO: Depth Attachment Clear Value)
     renderPassBeginInfo.clearValueCount = 1;
 
@@ -1215,9 +1242,12 @@ void VulkanRenderer::RecordCommands()
                     // Bind mesh index buffer, with 0 offset and using the uint32_t type
                     vkCmdBindIndexBuffer(m_commandBuffers[i], m_meshList[j].GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
+                    // Dynamic Offset Amount
+                    uint32_t dynamicOffset = static_cast<uint32_t>(m_modelUniformAlignment) * j;
+
                     // Bind Descriptor Sets
                     vkCmdBindDescriptorSets(m_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout,
-                                            0, 1, &m_descriptorSets[i], 0, nullptr);
+                                            0, 1, &m_descriptorSets[i], 1, &dynamicOffset);
 
                     // Execute Pipepline
                     vkCmdDrawIndexed(m_commandBuffers[i], m_meshList[j].GetIndexCount(), 1, 0, 0, 0);
@@ -1264,34 +1294,49 @@ void VulkanRenderer::CreateSynchronization()
 
 void VulkanRenderer::CreateUniformBuffers()
 {
-    // Buffer size will be size of all three vertices (will offset to access)
-    VkDeviceSize bufferSize = sizeof(MVP);
+    // View Projection Buffer size
+    VkDeviceSize vpBufferSize = sizeof(UBOViewProjection);
+
+    // Model buffer size
+    VkDeviceSize modelBufferSize = m_modelUniformAlignment * MAX_OBJECTS;
 
     // One uniform buffer for each image (and by extension, command buffer)
-    m_uniformBuffer.resize(m_swapChainImages.size());
-    m_uniformBufferMemory.resize(m_swapChainImages.size());
+    m_vpUniformBuffer.resize(m_swapChainImages.size());
+    m_vpUniformBufferMemory.resize(m_swapChainImages.size());
+    m_modelDynUniformBuffer.resize(m_swapChainImages.size());
+    m_modelDynUniformBufferMemory.resize(m_swapChainImages.size());
 
     // Create Uniform Buffers
     for (size_t i = 0; i < m_swapChainImages.size(); i++)
     {
-        CreateBuffer(m_mainDevice.physicalDevice, m_mainDevice.logicalDevice, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &m_uniformBuffer[i], &m_uniformBufferMemory[i]);
+        CreateBuffer(m_mainDevice.physicalDevice, m_mainDevice.logicalDevice, vpBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &m_vpUniformBuffer[i], &m_vpUniformBufferMemory[i]);
+
+        CreateBuffer(m_mainDevice.physicalDevice, m_mainDevice.logicalDevice, modelBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &m_modelDynUniformBuffer[i], &m_modelDynUniformBufferMemory[i]);
     }
 }
 
 void VulkanRenderer::CreateDescriptorPool()
 {
     // Type of decriptors + how many DESCRIPTORS, not Descriptor Sets (combined makes the pool size)
-    VkDescriptorPoolSize poolSize = {};
-    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSize.descriptorCount = static_cast<uint32_t>(m_uniformBuffer.size());
+    VkDescriptorPoolSize vpPoolSize = {};
+    vpPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    vpPoolSize.descriptorCount = static_cast<uint32_t>(m_vpUniformBuffer.size());
+
+    // Model Pool (DYNAMIC)
+    VkDescriptorPoolSize modelPoolSize = {};
+    modelPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    modelPoolSize.descriptorCount = static_cast<uint32_t>(m_modelDynUniformBuffer.size());
+
+    std::vector<VkDescriptorPoolSize> descriptorPoolSizes = {vpPoolSize, modelPoolSize};
 
     // Data to create Descriptor Pool
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
     descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    descriptorPoolCreateInfo.maxSets = static_cast<uint32_t>(m_uniformBuffer.size()); // Max no of Descriptor Sets that can be created from pool
-    descriptorPoolCreateInfo.poolSizeCount = 1;                                       // Amount of Pool Sizes being passed
-    descriptorPoolCreateInfo.pPoolSizes = &poolSize;                                  // Pool Sizes to create pool with
+    descriptorPoolCreateInfo.maxSets = static_cast<uint32_t>(m_swapChainImages.size());         // Max no of Descriptor Sets that can be created from pool
+    descriptorPoolCreateInfo.poolSizeCount = static_cast<uint32_t>(descriptorPoolSizes.size()); // Amount of Pool Sizes being passed
+    descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes.data();                           // Pool Sizes to create pool with
 
     // Create Descriptor Pool
     VkResult result = vkCreateDescriptorPool(m_mainDevice.logicalDevice, &descriptorPoolCreateInfo, nullptr, &m_descriptorPool);
@@ -1304,16 +1349,16 @@ void VulkanRenderer::CreateDescriptorPool()
 void VulkanRenderer::CreateDescriptorSets()
 {
     // Resize Descriptor Set list so one for every buffer
-    m_descriptorSets.resize(m_uniformBuffer.size());
+    m_descriptorSets.resize(m_swapChainImages.size());
 
-    std::vector<VkDescriptorSetLayout> setLayouts(m_uniformBuffer.size(), m_descriptorSetLayout);
+    std::vector<VkDescriptorSetLayout> setLayouts(m_swapChainImages.size(), m_descriptorSetLayout);
 
     // Descriptor Set Allocation Info
     VkDescriptorSetAllocateInfo setAllocInfo = {};
     setAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    setAllocInfo.descriptorPool = m_descriptorPool;                                  // Pool to allocate descriptor set from
-    setAllocInfo.descriptorSetCount = static_cast<uint32_t>(m_uniformBuffer.size()); // No of sets to allocate
-    setAllocInfo.pSetLayouts = setLayouts.data();                                    // Layouts to use to allocate sets (1:1 relationship)
+    setAllocInfo.descriptorPool = m_descriptorPool;                                    // Pool to allocate descriptor set from
+    setAllocInfo.descriptorSetCount = static_cast<uint32_t>(m_swapChainImages.size()); // No of sets to allocate
+    setAllocInfo.pSetLayouts = setLayouts.data();                                      // Layouts to use to allocate sets (1:1 relationship)
 
     // Allocate Descriptor Sets (multiple)
     VkResult result = vkAllocateDescriptorSets(m_mainDevice.logicalDevice, &setAllocInfo, m_descriptorSets.data());
@@ -1323,38 +1368,83 @@ void VulkanRenderer::CreateDescriptorSets()
     }
 
     // Update all of descriptor set buffer bindings
-    for (size_t i = 0; i < m_uniformBuffer.size(); i++)
+    for (size_t i = 0; i < m_swapChainImages.size(); i++)
     {
+        // VIEW PROJECTION DESCRIPTOR
         // Buffer info and offset info
-        VkDescriptorBufferInfo mvpBufferInfo = {};
-        mvpBufferInfo.buffer = m_uniformBuffer[i]; // Buffer to get data from
-        mvpBufferInfo.offset = 0;                  // Position of start of data
-        mvpBufferInfo.range = sizeof(MVP);         // Size of data
+        VkDescriptorBufferInfo vpBufferInfo = {};
+        vpBufferInfo.buffer = m_vpUniformBuffer[i];     // Buffer to get data from
+        vpBufferInfo.offset = 0;                        // Position of start of data
+        vpBufferInfo.range = sizeof(UBOViewProjection); // Size of data
 
         // Data about connection between binding and buffer
-        VkWriteDescriptorSet mvpSetWrite = {};
-        mvpSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        mvpSetWrite.dstSet = m_descriptorSets[i];                       // Descriptor Set to update
-        mvpSetWrite.dstBinding = 0;                                     // Binding to update (matches with binding on layout/shader)
-        mvpSetWrite.dstArrayElement = 0;                                // Index in array to update
-        mvpSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // Type of descriptor
-        mvpSetWrite.descriptorCount = 1;                                // Amount to update
-        mvpSetWrite.pBufferInfo = &mvpBufferInfo;                       // Information about buffer data to bind
+        VkWriteDescriptorSet vpSetWrite = {};
+        vpSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        vpSetWrite.dstSet = m_descriptorSets[i];                       // Descriptor Set to update
+        vpSetWrite.dstBinding = 0;                                     // Binding to update (matches with binding on layout/shader)
+        vpSetWrite.dstArrayElement = 0;                                // Index in array to update
+        vpSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // Type of descriptor
+        vpSetWrite.descriptorCount = 1;                                // Amount to update
+        vpSetWrite.pBufferInfo = &vpBufferInfo;                        // Information about buffer data to bind
+
+        // MODEL DESCRIPTOR
+        // Model Buffer Binding info
+        VkDescriptorBufferInfo modelBufferInfo = {};
+        modelBufferInfo.buffer = m_modelDynUniformBuffer[i];
+        modelBufferInfo.offset = 0;
+        modelBufferInfo.range = m_modelUniformAlignment;
+
+        VkWriteDescriptorSet modelSetWrite = {};
+        modelSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        modelSetWrite.dstSet = m_descriptorSets[i];
+        modelSetWrite.dstBinding = 1;
+        modelSetWrite.dstArrayElement = 0;
+        modelSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+        modelSetWrite.descriptorCount = 1;
+        modelSetWrite.pBufferInfo = &modelBufferInfo;
+
+        // List of Descriptor Set Writes
+        std::vector<VkWriteDescriptorSet> setWrites = {vpSetWrite, modelSetWrite};
 
         // Update the descirptor sets with new buffer/binding info
-        vkUpdateDescriptorSets(m_mainDevice.logicalDevice, 1, &mvpSetWrite, 0, nullptr);
+        vkUpdateDescriptorSets(m_mainDevice.logicalDevice, static_cast<uint32_t>(setWrites.size()), setWrites.data(), 0, nullptr);
     }
 }
 
-void VulkanRenderer::UpdateUniformBuffer(uint32_t imageIndex)
+void VulkanRenderer::UpdateUniformBuffers(uint32_t imageIndex)
 {
+    // Copy VP data
     void *data;
-    vkMapMemory(m_mainDevice.logicalDevice, m_uniformBufferMemory[imageIndex], 0, sizeof(MVP), 0, &data);
-    memcpy(data, &mvp, sizeof(MVP));
-    vkUnmapMemory(m_mainDevice.logicalDevice, m_uniformBufferMemory[imageIndex]);
+    vkMapMemory(m_mainDevice.logicalDevice, m_vpUniformBufferMemory[imageIndex], 0, sizeof(UBOViewProjection), 0, &data);
+    memcpy(data, &m_uboViewProjection, sizeof(UBOViewProjection));
+    vkUnmapMemory(m_mainDevice.logicalDevice, m_vpUniformBufferMemory[imageIndex]);
+
+    // Copy Model data
+    for (size_t i = 0; i < m_meshList.size(); i++)
+    {
+        UBOModel *thisModel = (UBOModel *)((uint64_t)m_modelTransferSpace + (i * m_modelUniformAlignment));
+        *thisModel = m_meshList[i].GetModel();
+    }
+
+    // Map the list of model data
+    vkMapMemory(m_mainDevice.logicalDevice, m_modelDynUniformBufferMemory[imageIndex], 0, m_modelUniformAlignment * m_meshList.size(), 0, &data);
+    memcpy(data, m_modelTransferSpace, m_modelUniformAlignment * m_meshList.size());
+    vkUnmapMemory(m_mainDevice.logicalDevice, m_modelDynUniformBufferMemory[imageIndex]);
 }
 
-void VulkanRenderer::UpdateModel(glm::mat4 newModel)
+void VulkanRenderer::UpdateModel(size_t modelID, glm::mat4 newModel)
 {
-    mvp.model = newModel;
+    if (modelID < m_meshList.size())
+    {
+        m_meshList[modelID].SetModel(newModel);
+    }
+}
+
+void VulkanRenderer::AllocateDynamicBufferTransferSpace()
+{
+    // Calculate allignment of model data
+    m_modelUniformAlignment = (sizeof(UBOModel) + m_minUniformBufferOffset - 1) & ~(m_minUniformBufferOffset - 1);
+
+    // Create space in memory to hold dynamic buffer that is aligned to our required alignement and hold MAX_OBJECTS
+    m_modelTransferSpace = (UBOModel *)aligned_alloc(m_modelUniformAlignment, m_modelUniformAlignment * MAX_OBJECTS);
 }

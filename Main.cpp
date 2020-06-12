@@ -53,7 +53,15 @@ int main(int argc, char *argv[])
             angle = 0.f;
         }
 
-        vulkanRenderer.UpdateModel(glm::rotate(glm::mat4(1.0f), glm::radians(angle), glm::vec3(0.0f, 0.0f, 1.0f)));
+        glm::mat4 firstModel(1.f);
+        firstModel = glm::translate(firstModel, glm::vec3(-2.f, 0.f, -5.f));
+        firstModel = glm::rotate(firstModel, glm::radians(angle), glm::vec3(0.0f, 0.0f, 1.0f));
+        vulkanRenderer.UpdateModel(0, firstModel);
+
+        glm::mat4 secondModel(1.f);
+        secondModel = glm::translate(secondModel, glm::vec3(2.f, 0.f, -5.f));
+        secondModel = glm::rotate(secondModel, glm::radians(-angle * 2), glm::vec3(0.0f, 0.0f, 1.0f));
+        vulkanRenderer.UpdateModel(1, secondModel);
 
         vulkanRenderer.Draw();
     }

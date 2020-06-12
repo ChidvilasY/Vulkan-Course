@@ -7,7 +7,8 @@ Mesh::Mesh()
 }
 
 Mesh::Mesh(VkPhysicalDevice newPhysicalDevice, VkDevice newDevice, VkQueue transferQueue, VkCommandPool transferCommandPool, std::vector<Vertex> *vertices, std::vector<uint32_t> *indices)
-    : m_vertexCount(vertices->size()),
+    : m_uboModel({glm::mat4(1.0f)}),
+      m_vertexCount(vertices->size()),
       m_indexCount(indices->size()),
       m_physicalDevice(newPhysicalDevice),
       m_device(newDevice)
@@ -118,5 +119,16 @@ void Mesh::DestroyBuffers()
     m_indexBufferMemory = nullptr;
 
     vkDestroyBuffer(m_device, m_indexBuffer, nullptr);
+
     m_indexBuffer = nullptr;
+}
+
+void Mesh::SetModel(glm::mat4 newModel)
+{
+    m_uboModel.model = newModel;
+}
+
+UBOModel Mesh::GetModel()
+{
+    return m_uboModel;
 }
