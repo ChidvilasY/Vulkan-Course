@@ -38,7 +38,8 @@ private:
     std::vector<Mesh> m_meshList;
 
     // Scene Settings
-    struct UBOViewProjection {
+    struct UBOViewProjection
+    {
         glm::mat4 projection;
         glm::mat4 view;
     } m_uboViewProjection;
@@ -61,6 +62,11 @@ private:
     std::vector<SwapchainImage> m_swapChainImages{};
     std::vector<VkFramebuffer> m_swapChainFrameBuffers{};
     std::vector<VkCommandBuffer> m_commandBuffers{};
+
+    VkFormat m_depthFormat{};
+    VkImage m_depthBufferImage{};
+    VkDeviceMemory m_depthBufferImageMemory{};
+    VkImageView m_depthBufferImageView{};
 
     // - Descriptors
     VkDescriptorSetLayout m_descriptorSetLayout{};
@@ -112,6 +118,7 @@ private:
     void CreateDescriptorSetLayout();
     void CreatePushConstantRange();
     void CreateGraphicsPipeline();
+    void CreateDepthBufferImage();
     void CreateFrameBuffers();
     void CreateCommandPool();
     void CreateCommandBuffers();
@@ -147,8 +154,12 @@ private:
     VkSurfaceFormatKHR ChooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &formats);
     VkPresentModeKHR ChooseBestPresentationMode(const std::vector<VkPresentModeKHR> &presentationModes);
     VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR &surfaceCapabilities);
+    VkFormat ChooseSupportedFormat(const std::vector<VkFormat> &formats, VkImageTiling tiling, VkFormatFeatureFlags featureFlags);
 
     // -- Create Functions
     VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
     VkShaderModule CreateShaderModule(const std::vector<char> &code);
+    VkImage CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
+                        VkImageUsageFlags usageFlags, VkMemoryPropertyFlags propFlags,
+                        VkDeviceMemory *imageMemory);
 };
