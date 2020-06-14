@@ -128,7 +128,12 @@ void Mesh::SetModel(glm::mat4 newModel)
     m_uboModel.model = newModel;
 }
 
-UBOModel Mesh::GetModel()
+Model Mesh::GetModel()
 {
     return m_uboModel;
+}
+
+const Model* Mesh::GetModelPtr()
+{
+    return &m_uboModel;
 }

@@ -64,6 +64,7 @@ private:
 
     // - Descriptors
     VkDescriptorSetLayout m_descriptorSetLayout{};
+    VkPushConstantRange m_pushConstantRange{};
 
     VkDescriptorPool m_descriptorPool{};
     std::vector<VkDescriptorSet> m_descriptorSets{};
@@ -74,10 +75,9 @@ private:
     std::vector<VkBuffer> m_modelDynUniformBuffer{};
     std::vector<VkDeviceMemory> m_modelDynUniformBufferMemory{};
 
-    VkDeviceSize m_minUniformBufferOffset{};
-    size_t m_modelUniformAlignment{};
-
-    UBOModel *m_modelTransferSpace{};
+    // VkDeviceSize m_minUniformBufferOffset{};
+    // size_t m_modelUniformAlignment{};
+    // Model *m_modelTransferSpace{}; Using push constants instead
 
     // - Pipeline
     VkPipeline m_graphicsPipeline{};
@@ -110,6 +110,7 @@ private:
     void CreateSwapChain();
     void CreateRenderPass();
     void CreateDescriptorSetLayout();
+    void CreatePushConstantRange();
     void CreateGraphicsPipeline();
     void CreateFrameBuffers();
     void CreateCommandPool();
@@ -123,7 +124,7 @@ private:
     void UpdateUniformBuffers(uint32_t imageIndex);
 
     // - Record Functions
-    void RecordCommands();
+    void RecordCommands(uint32_t currentImage);
 
     // - Get Functions
     void GetPhysicalDevice();
