@@ -5,7 +5,9 @@
             "includePath": [
                 "${workspaceFolder}/../glm"
             ],
-            "defines": [],
+            "defines": [
+                "_DEBUG"
+            ],
             "compilerPath": "/usr/bin/g++",
             "cStandard": "c11",
             "cppStandard": "gnu++17",
@@ -18,7 +20,9 @@
                 "C:/VulkanSDK/1.2.135.0/Include",
                 "C:/GLFW/glfw-3.3.2.bin.WIN64/include"
             ],
-            "defines": [],
+            "defines": [
+                "_DEBUG"
+            ],
             "compilerPath": "C:/Strawberry64/c/bin/g++.exe",
             "cStandard": "c11",
             "cppStandard": "gnu++17",

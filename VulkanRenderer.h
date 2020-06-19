@@ -12,6 +12,8 @@
 #include <set>
 #include <algorithm>
 
+#include "stb_image.h"
+
 #include "VulkanValidation.h"
 #include "Utilities.h"
 #include "Mesh.hpp"
@@ -84,6 +86,11 @@ private:
     // VkDeviceSize m_minUniformBufferOffset{};
     // size_t m_modelUniformAlignment{};
     // Model *m_modelTransferSpace{}; Using push constants instead
+
+    // - Assets
+    std::vector<VkImage> m_textureImages{};
+    std::vector<VkDeviceMemory> m_textureImageMemory{};
+
 
     // - Pipeline
     VkPipeline m_graphicsPipeline{};
@@ -162,4 +169,8 @@ private:
     VkImage CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
                         VkImageUsageFlags usageFlags, VkMemoryPropertyFlags propFlags,
                         VkDeviceMemory *imageMemory);
+
+    int CreateTexture(const std::string fileName);
+    // -- Loader Functions
+    stbi_uc *LoadTexture(const std::string fileName, int *width, int *height, VkDeviceSize *imageSize);
 };

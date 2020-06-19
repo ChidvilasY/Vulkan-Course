@@ -7,9 +7,9 @@
 
 
 #if _DEBUG
-const bool gEnableValidationLayers = true;
+constexpr bool gEnableValidationLayers = true;
 #else
-const bool gEnableValidationLayers = false;
+constexpr bool gEnableValidationLayers = false;
 #endif
 
 // List of validation layers to use

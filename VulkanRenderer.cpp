@@ -32,6 +32,8 @@ int VulkanRenderer::Init(GLFWwindow *newWindow)
         CreateCommandPool();
 
         {
+            int firstTexture = CreateTexture("om.jpg");
+
             m_uboViewProjection.projection = glm::perspective(glm::radians(45.f), m_swapChainExtent.width / (float)m_swapChainExtent.height, 0.1f, 100.f);
             m_uboViewProjection.view = glm::lookAt(glm::vec3(3.5f, 0.0f, -1.0f), glm::vec3(0.0f, 0.0f, -4.0f), glm::vec3(0.0f, 1.0f, 0.0f));
             m_uboViewProjection.projection[1][1] *= -1; // Vulkan Considers Y-axis negative to be UP direction
@@ -141,6 +143,15 @@ void VulkanRenderer::CleanUP()
     vkDeviceWaitIdle(m_mainDevice.logicalDevice);
 
     // free(m_modelTransferSpace);
+
+    for (size_t i = 0; i < m_textureImages.size(); i++)
+    {
+        vkDestroyImage(m_mainDevice.logicalDevice, m_textureImages[i], nullptr);
+        m_textureImages[i] = nullptr;
+
+        vkFreeMemory(m_mainDevice.logicalDevice, m_textureImageMemory[i], nullptr);
+        m_textureImageMemory[i] = nullptr;
+    }
 
     vkDestroyImageView(m_mainDevice.logicalDevice, m_depthBufferImageView, nullptr);
     m_depthBufferImageView = nullptr;
@@ -1591,4 +1602,75 @@ VkFormat VulkanRenderer::ChooseSupportedFormat(const std::vector<VkFormat> &form
     }
 
     throw std::runtime_error("Failed to find a matching format");
+}
+
+stbi_uc *VulkanRenderer::LoadTexture(const std::string filename, int *width, int *height, VkDeviceSize *imageSize)
+{
+    // Number of channels image uses
+    int channels;
+
+    // Load pixel data for image
+    const std::string fileLoc = "Textures/" + filename;
+    stbi_uc *image = stbi_load(fileLoc.c_str(), width, height, &channels, STBI_rgb_alpha);
+    if (image == nullptr)
+    {
+        throw std::runtime_error("Failed to load a Texture file! (" + filename + ")");
+    }
+
+    // Calculate image size using given and known data
+    *imageSize = *width * *height * 4;
+
+    return image;
+}
+
+int VulkanRenderer::CreateTexture(const std::string fileName)
+{
+    // Load image file
+    int width, height;
+    VkDeviceSize imageSize;
+
+    stbi_uc *imageData = LoadTexture(fileName, &width, &height, &imageSize);
+
+    // Create staging buffer to hold loaded data, ready to copy to device
+    VkBuffer imageStagingBuffer;
+    VkDeviceMemory imageStagingBufferMemory;
+    CreateBuffer(m_mainDevice.physicalDevice, m_mainDevice.logicalDevice, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &imageStagingBuffer, &imageStagingBufferMemory);
+
+    // Copy image data to staging buffer
+    void *data;
+    vkMapMemory(m_mainDevice.logicalDevice, imageStagingBufferMemory, 0, imageSize, 0, &data);
+    memcpy(data, imageData, static_cast<size_t>(imageSize));
+    vkUnmapMemory(m_mainDevice.logicalDevice, imageStagingBufferMemory);
+
+    // Free original image data
+    stbi_image_free(imageData);
+
+    // Create image to hold final texture
+    VkImage texImage;
+    VkDeviceMemory texImageMemory;
+    texImage = CreateImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+                           VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &texImageMemory);
+
+    // COPY DATA TO IMAGE
+    // Transition image to be DST for copy operation
+    TransitionImageLayout(m_mainDevice.logicalDevice, m_graphicsQueue, m_graphicsCommandPool, texImage,
+                          VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    // Copy image data
+    CopyImageBuffer(m_mainDevice.logicalDevice, m_graphicsQueue, m_graphicsCommandPool, imageStagingBuffer, texImage, width, height);
+
+    TransitionImageLayout(m_mainDevice.logicalDevice, m_graphicsQueue, m_graphicsCommandPool, texImage,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    // Add texture data to vector for reference
+    m_textureImages.push_back(texImage);
+    m_textureImageMemory.push_back(texImageMemory);
+
+    // Destroy staging buffers
+    vkDestroyBuffer(m_mainDevice.logicalDevice, imageStagingBuffer, nullptr);
+    vkFreeMemory(m_mainDevice.logicalDevice, imageStagingBufferMemory, nullptr);
+
+    // Return index of new texture image
+    return m_textureImages.size() - 1;
 }

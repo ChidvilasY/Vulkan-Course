@@ -2,7 +2,8 @@
 SRCS := \
     Main.cpp \
 	VulkanRenderer.cpp \
-	Mesh.cpp
+	Mesh.cpp \
+	stb_image.h
 
 
 ifeq ($(OS),Windows_NT)
