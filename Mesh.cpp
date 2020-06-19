@@ -6,8 +6,9 @@ Mesh::Mesh()
 {
 }
 
-Mesh::Mesh(VkPhysicalDevice newPhysicalDevice, VkDevice newDevice, VkQueue transferQueue, VkCommandPool transferCommandPool, std::vector<Vertex> *vertices, std::vector<uint32_t> *indices)
-    : m_uboModel({glm::mat4(1.0f)}),
+Mesh::Mesh(VkPhysicalDevice newPhysicalDevice, VkDevice newDevice, VkQueue transferQueue, VkCommandPool transferCommandPool, std::vector<Vertex> *vertices, std::vector<uint32_t> *indices, int newTexId)
+    :  m_uboModel({glm::mat4(1.0f)}),
+      m_texId(newTexId),
       m_vertexCount(vertices->size()),
       m_indexCount(indices->size()),
       m_physicalDevice(newPhysicalDevice),
@@ -133,7 +134,12 @@ Model Mesh::GetModel()
     return m_uboModel;
 }
 
-const Model* Mesh::GetModelPtr()
+const Model *Mesh::GetModelPtr()
 {
     return &m_uboModel;
+}
+
+int Mesh::GetTexId()
+{
+    return m_texId;
 }

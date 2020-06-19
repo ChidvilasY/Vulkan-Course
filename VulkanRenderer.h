@@ -70,12 +70,17 @@ private:
     VkDeviceMemory m_depthBufferImageMemory{};
     VkImageView m_depthBufferImageView{};
 
+    VkSampler m_textureSampler{};
+
     // - Descriptors
     VkDescriptorSetLayout m_descriptorSetLayout{};
+    VkDescriptorSetLayout m_samplerSetLayout{};
     VkPushConstantRange m_pushConstantRange{};
 
     VkDescriptorPool m_descriptorPool{};
+    VkDescriptorPool m_samplerDescriptorPool{};
     std::vector<VkDescriptorSet> m_descriptorSets{};
+    std::vector<VkDescriptorSet> m_samplerDescriptorSets{};
 
     std::vector<VkBuffer> m_vpUniformBuffer{};
     std::vector<VkDeviceMemory> m_vpUniformBufferMemory{};
@@ -89,8 +94,8 @@ private:
 
     // - Assets
     std::vector<VkImage> m_textureImages{};
-    std::vector<VkDeviceMemory> m_textureImageMemory{};
-
+    std::vector<VkDeviceMemory> m_textureImageMemorys{};
+    std::vector<VkImageView> m_textureImageViews{};
 
     // - Pipeline
     VkPipeline m_graphicsPipeline{};
@@ -130,6 +135,7 @@ private:
     void CreateCommandPool();
     void CreateCommandBuffers();
     void CreateSynchronization();
+    void CreateTextureSampler();
 
     void CreateUniformBuffers();
     void CreateDescriptorPool();
@@ -170,7 +176,10 @@ private:
                         VkImageUsageFlags usageFlags, VkMemoryPropertyFlags propFlags,
                         VkDeviceMemory *imageMemory);
 
+    int CreateTextureImage(const std::string fileName);
     int CreateTexture(const std::string fileName);
+    int CreateTextureDescriptor(VkImageView textureImageView);
+
     // -- Loader Functions
     stbi_uc *LoadTexture(const std::string fileName, int *width, int *height, VkDeviceSize *imageSize);
 };

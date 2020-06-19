@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
 
         glm::mat4 secondModel(1.f);
         secondModel = glm::translate(secondModel, glm::vec3(0.f, 0.f, sinf(glm::radians(angle * 5)) * 2.f - 4.f));
-        secondModel = glm::rotate(secondModel, glm::radians(-angle * 5), glm::vec3(0.0f, 0.0f, 1.0f));
+        secondModel = glm::rotate(secondModel, glm::radians(-angle * 8), glm::vec3(0.0f, 0.0f, 1.0f));
         vulkanRenderer.UpdateModel(1, secondModel);
 
         vulkanRenderer.Draw();

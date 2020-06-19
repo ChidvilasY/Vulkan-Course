@@ -1,5 +1,8 @@
 {
     "files.associations": {
-        "iostream": "cpp"
+        "*.mak": "makefile",
+        "iostream": "cpp",
+        "stdexcept": "cpp",
+        "array": "cpp"
     }
 }
