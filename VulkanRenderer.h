@@ -6,6 +6,10 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+
 #include <iostream>
 #include <stdexcept>
 #include <vector>
@@ -17,6 +21,7 @@
 #include "VulkanValidation.h"
 #include "Utilities.h"
 #include "Mesh.hpp"
+#include "MeshModel.hpp"
 
 class VulkanRenderer
 {
@@ -25,7 +30,7 @@ public:
     ~VulkanRenderer();
 
     int Init(GLFWwindow *newWindow);
-
+    int CreateMeshModel(const std::string modelFileName);
     void UpdateModel(size_t modelID, glm::mat4 newModel);
 
     void Draw();
@@ -37,7 +42,7 @@ private:
     int m_currentFrame = 0;
 
     // Scene Objects
-    std::vector<Mesh> m_meshList;
+    std::vector<MeshModel> m_meshModels{};
 
     // Scene Settings
     struct UBOViewProjection

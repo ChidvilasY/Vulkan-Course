@@ -38,7 +38,7 @@ CXXFLAGS := -std=c++17
 # C/C++ flags
 CPPFLAGS := -g -Wall -pedantic -D_DEBUG=1 -Wno-unused-function
 # linker flags
-LDFLAGS := -lglfw3 -lGLEW -lGLU -lGL -lpthread -lm -ldl -lvulkan
+LDFLAGS := -lglfw3 -lGLEW -lGLU -lGL -lpthread -lm -ldl -lvulkan -lassimp
 # flags required for dependency generation; passed to compilers
 DEPFLAGS = -MT $@ -MD -MP -MF $(DEPDIR)/$*.Td
 

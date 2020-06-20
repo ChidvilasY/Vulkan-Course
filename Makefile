@@ -3,6 +3,7 @@ SRCS := \
     Main.cpp \
 	VulkanRenderer.cpp \
 	Mesh.cpp \
+	MeshModel.cpp \
 	stb_image.h
 
 

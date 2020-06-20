@@ -8,7 +8,7 @@
 #include <glm/glm.hpp>
 
 constexpr int MAX_FRAME_DRAWS = 2;
-constexpr int MAX_OBJECTS = 2;
+constexpr int MAX_OBJECTS = 20;
 
 const std::vector<const char *> gDeviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME};

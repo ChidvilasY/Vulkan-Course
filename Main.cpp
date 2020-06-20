@@ -12,7 +12,7 @@
 GLFWwindow *window;
 VulkanRenderer vulkanRenderer;
 
-void InitWindow(std::string wName = "Vulkan Window", const int width = 800, const int height = 600)
+void InitWindow(std::string wName = "Vulkan Window", const int width = 1280, const int height = 720)
 {
     // GLFW Init
     glfwInit();
@@ -40,6 +40,8 @@ int main(int argc, char *argv[])
     double deltaTime = 0.0f;
     double lastTime = 0.0f;
 
+    int helicopter = vulkanRenderer.CreateMeshModel("Models/uh60.obj");
+
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
@@ -55,15 +57,9 @@ int main(int argc, char *argv[])
             angle = 0.f;
         }
 
-        glm::mat4 firstModel(1.f);
-        firstModel = glm::translate(firstModel, glm::vec3(0.f, 1.f, -3.f));
-        firstModel = glm::rotate(firstModel, glm::radians(angle), glm::vec3(0.0f, 0.0f, 1.0f));
-        vulkanRenderer.UpdateModel(0, firstModel);
-
-        glm::mat4 secondModel(1.f);
-        secondModel = glm::translate(secondModel, glm::vec3(0.f, 0.f, sinf(glm::radians(angle * 5)) * 2.f - 4.f));
-        secondModel = glm::rotate(secondModel, glm::radians(-angle * 8), glm::vec3(0.0f, 0.0f, 1.0f));
-        vulkanRenderer.UpdateModel(1, secondModel);
+        glm::mat4 testMat = glm::rotate(glm::mat4(1.f), glm::radians(angle), glm::vec3(0.f, 1.0f, 0.0f));
+        testMat = glm::rotate(testMat, glm::radians(-90.f), glm::vec3(1.f, 0.f, 0.f));
+        vulkanRenderer.UpdateModel(helicopter, testMat);
 
         vulkanRenderer.Draw();
     }
