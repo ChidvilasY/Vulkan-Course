@@ -52,5 +52,6 @@
         "streambuf": "cpp",
         "cinttypes": "cpp",
         "typeinfo": "cpp"
-    }
+    },
+    "glsl-linter.validatorArgs": ["-V"]
 }

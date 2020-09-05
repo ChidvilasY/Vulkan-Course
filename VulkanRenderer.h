@@ -70,22 +70,28 @@ private:
     std::vector<VkFramebuffer> m_swapChainFrameBuffers{};
     std::vector<VkCommandBuffer> m_commandBuffers{};
 
-    VkFormat m_depthFormat{};
-    VkImage m_depthBufferImage{};
-    VkDeviceMemory m_depthBufferImageMemory{};
-    VkImageView m_depthBufferImageView{};
+    std::vector<VkImage> m_depthBufferImage{};
+    std::vector<VkDeviceMemory> m_depthBufferImageMemory{};
+    std::vector<VkImageView> m_depthBufferImageView{};
+
+    std::vector<VkImage> m_colorBufferImage{};
+    std::vector<VkDeviceMemory> m_colorBufferImageMemory{};
+    std::vector<VkImageView> m_colorBufferImageView{};
 
     VkSampler m_textureSampler{};
 
     // - Descriptors
     VkDescriptorSetLayout m_descriptorSetLayout{};
     VkDescriptorSetLayout m_samplerSetLayout{};
+    VkDescriptorSetLayout m_inputSetLayout{};
     VkPushConstantRange m_pushConstantRange{};
 
     VkDescriptorPool m_descriptorPool{};
     VkDescriptorPool m_samplerDescriptorPool{};
+    VkDescriptorPool m_inputDescriptorPool{};
     std::vector<VkDescriptorSet> m_descriptorSets{};
     std::vector<VkDescriptorSet> m_samplerDescriptorSets{};
+    std::vector<VkDescriptorSet> m_inputDescriptorSets{};
 
     std::vector<VkBuffer> m_vpUniformBuffer{};
     std::vector<VkDeviceMemory> m_vpUniformBufferMemory{};
@@ -105,6 +111,10 @@ private:
     // - Pipeline
     VkPipeline m_graphicsPipeline{};
     VkPipelineLayout m_pipelineLayout{};
+
+    VkPipeline m_secondPipeline{};
+    VkPipelineLayout m_secondPipelineLayout{};
+
     VkRenderPass m_renderPass{};
 
     // - Pools
@@ -135,6 +145,7 @@ private:
     void CreateDescriptorSetLayout();
     void CreatePushConstantRange();
     void CreateGraphicsPipeline();
+    void CreateColorBufferImage();
     void CreateDepthBufferImage();
     void CreateFrameBuffers();
     void CreateCommandPool();
@@ -145,6 +156,7 @@ private:
     void CreateUniformBuffers();
     void CreateDescriptorPool();
     void CreateDescriptorSets();
+    void CreateInputDescriptorSets();
 
     void UpdateUniformBuffers(uint32_t imageIndex);
 
